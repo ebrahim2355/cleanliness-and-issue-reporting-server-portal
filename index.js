@@ -61,14 +61,22 @@ async function run() {
             res.send(result);
         })
 
+
         app.get("/issues", async (req, res) => {
             try {
-                const result = await issuesCollection.find().toArray();
-                res.status(200).json(result);
+                const { email } = req.query; // optional query param
+                let query = {};
+                if (email) {
+                    query.email = email; // filter by user email
+                }
+                const issues = await issuesCollection.find(query).toArray();
+                res.status(200).json(issues);
             } catch (error) {
+                console.error(error);
                 res.status(500).json({ message: "Failed to fetch issues", error: error.message });
             }
         });
+
 
         app.get("/issues/:id", async (req, res) => {
             const { id } = req.params;
@@ -81,12 +89,48 @@ async function run() {
             }
         });
 
+        app.put("/issues/:id", async (req, res) => {
+            const { id } = req.params;
+            const updatedData = req.body;
+
+            try {
+                const result = await issuesCollection.updateOne(
+                    { _id: new ObjectId(id) },
+                    { $set: updatedData }
+                );
+                if (result.matchedCount === 0) {
+                    return res.status(404).send({ message: "Issue not found" });
+                }
+                res.send({ message: "Issue updated successfully" });
+            } catch (err) {
+                console.error(err);
+                res.status(500).send({ message: "Failed to update issue" });
+            }
+        });
+
+        app.delete("/issues/:id", async (req, res) => {
+            const { id } = req.params;
+
+            try {
+                const result = await issuesCollection.deleteOne({ _id: new ObjectId(id) });
+                if (result.deletedCount === 0) {
+                    return res.status(404).send({ message: "Issue not found" });
+                }
+                res.send({ message: "Issue deleted successfully" });
+            } catch (err) {
+                console.error(err);
+                res.status(500).send({ message: "Failed to delete issue" });
+            }
+        });
+
+
 
         // CONTRIBUTION APIs
         app.post("/contributions", async (req, res) => {
             try {
                 const contribution = req.body;
                 contribution.date = new Date(); // ensure date is set
+                contribution.status = "pending";
                 const result = await contributionsCollection.insertOne(contribution);
                 res.status(201).send(result);
             } catch (err) {
@@ -97,11 +141,12 @@ async function run() {
 
         app.get("/contributions", async (req, res) => {
             try {
-                const { issueId } = req.query;
+                const { issueId, email } = req.query;
                 let query = {};
-                if (issueId) {
-                    query.issueId = issueId;
-                }
+
+                if (issueId) query.issueId = issueId;
+                if (email) query.email = email;
+
                 const contributions = await contributionsCollection.find(query).toArray();
                 res.status(200).send(contributions);
             } catch (err) {
@@ -109,6 +154,7 @@ async function run() {
                 res.status(500).send({ message: "Failed to fetch contributions" });
             }
         });
+
 
 
     }
