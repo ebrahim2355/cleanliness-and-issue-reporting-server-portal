@@ -38,7 +38,7 @@ async function run() {
         await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
-        // USERS ASIs
+        // USERS APIs
         app.post("/users", async (req, res) => {
             const newUser = req.body;
 
@@ -52,6 +52,18 @@ async function run() {
                 res.send(result);
             }
         })
+
+        // GET all users
+        app.get("/users", async (req, res) => {
+            try {
+                const users = await usersCollection.find().toArray();
+                res.status(200).json(users);
+            } catch (err) {
+                console.error(err);
+                res.status(500).json({ message: "Failed to fetch users" });
+            }
+        });
+
 
         // ISSUES APIs
         app.post("/issues", async (req, res) => {
@@ -155,6 +167,37 @@ async function run() {
             }
         });
 
+
+        // Get loyal users based on number of contributions
+        app.get("/loyalUsers", async (req, res) => {
+            try {
+                // Aggregate contributions to count per user
+                const pipeline = [
+                    {
+                        $group: {
+                            _id: "$email",
+                            name: { $first: "$name" },
+                            phone: { $first: "$phone" },
+                            address: { $first: "$address" },
+                            totalContributions: { $sum: 1 }
+                        }
+                    },
+                    { $sort: { totalContributions: -1 } }, // most loyal first
+                    { $limit: 5 } // top 5 loyal users
+                ];
+
+                const loyalUsers = await client
+                    .db("community-cleanliness")
+                    .collection("contributions")
+                    .aggregate(pipeline)
+                    .toArray();
+
+                res.status(200).json(loyalUsers);
+            } catch (err) {
+                console.error(err);
+                res.status(500).json({ message: "Failed to fetch loyal users", error: err.message });
+            }
+        });
 
 
     }
